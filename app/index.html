@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>StockAudit</title>
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/exceljs.min.js"></script>
+<style>
+  :root{
+    --bg:#15181c; --panel:#1c2126; --panel2:#20262c; --border:#2b3238;
+    --text:#e6e9ec; --sub:#8a949e; --accent:#5fb3a3; --accent2:#e0a458;
+    --danger:#d9705f; --mono:'SF Mono',Consolas,'Courier New',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    background:var(--bg); color:var(--text); font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;
+    margin:0; padding:32px 24px 80px; line-height:1.45;
+  }
+  .wrap{max-width:980px; margin:0 auto;}
+  h1{font-size:22px; font-weight:650; margin:0 0 4px;}
+  .tag{color:var(--sub); font-size:13px; margin-bottom:28px;}
+  .step{
+    background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    padding:20px 22px; margin-bottom:16px;
+  }
+  .step h2{
+    font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--accent);
+    margin:0 0 14px; display:flex; align-items:center; gap:8px;
+  }
+  .step h2 .n{
+    background:var(--accent); color:#0e1216; width:20px; height:20px; border-radius:5px;
+    display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;
+  }
+  .drop{
+    border:1.5px dashed var(--border); border-radius:8px; padding:22px; text-align:center;
+    color:var(--sub); font-size:13.5px; cursor:pointer; transition:.15s;
+  }
+  .drop:hover, .drop.over{border-color:var(--accent); color:var(--text); background:rgba(95,179,163,.05);}
+  .drop input{display:none;}
+  .filepill{
+    display:inline-flex; align-items:center; gap:8px; background:var(--panel2); border:1px solid var(--border);
+    border-radius:20px; padding:5px 12px 5px 10px; font-size:12.5px; margin-top:10px;
+  }
+  .filepill .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
+  .mapgrid{display:grid; grid-template-columns:1fr 1fr; gap:12px 20px; margin-top:16px;}
+  .mapgrid label{font-size:12px; color:var(--sub); display:block; margin-bottom:4px;}
+  select, input[type=text]{
+    width:100%; background:var(--panel2); border:1px solid var(--border); color:var(--text);
+    border-radius:6px; padding:8px 10px; font-size:13px;
+  }
+  .opts{display:grid; grid-template-columns:1fr 1fr; gap:10px 24px;}
+  .optrow{display:flex; align-items:flex-start; gap:10px; font-size:13px; padding:6px 0;}
+  .optrow input{margin-top:3px;}
+  .optrow .desc{color:var(--sub); font-size:11.5px; margin-top:2px;}
+  button.primary{
+    background:var(--accent); color:#0e1216; border:none; border-radius:7px; padding:11px 20px;
+    font-size:14px; font-weight:650; cursor:pointer; margin-top:6px;
+  }
+  button.primary:hover{filter:brightness(1.08);}
+  button.primary:disabled{opacity:.4; cursor:not-allowed;}
+  button.ghost{
+    background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:7px;
+    padding:9px 16px; font-size:13px; cursor:pointer;
+  }
+  .summary{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:16px 0 4px;}
+  .card{background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:14px;}
+  .card .num{font-size:22px; font-weight:700; color:var(--accent2);}
+  .card .lab{font-size:11.5px; color:var(--sub); margin-top:2px;}
+  table{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:14px;}
+  th{text-align:left; color:var(--sub); font-weight:600; border-bottom:1px solid var(--border); padding:6px 8px; font-size:11px; text-transform:uppercase;}
+  td{padding:6px 8px; border-bottom:1px solid #23282e; font-family:var(--mono); font-size:12px;}
+  .flag-yes{color:var(--accent2); font-weight:600;}
+  .flag-no{color:var(--sub);}
+  tr.row-flagged td{background:rgba(224,164,88,.10);}
+  tr.row-flagged td:first-child{box-shadow:inset 3px 0 0 var(--accent2);}
+  .warn{color:var(--danger); font-size:12.5px; margin-top:10px;}
+  .hint{color:var(--sub); font-size:11.5px; margin-top:8px;}
+  .hidden{display:none !important;}
+  .footnote{color:var(--sub); font-size:11px; margin-top:26px; text-align:center;}
+
+  /* License strip + activation panel */
+  .license-strip{
+    display:none; align-items:center; gap:12px; margin:0 0 18px;
+    padding:10px 16px; background:var(--panel); border:1px solid var(--border);
+    border-radius:10px; font-size:13px;
+  }
+  .license-strip .pill{
+    font-family:var(--mono); font-size:11px; letter-spacing:.05em;
+    padding:4px 10px; border-radius:20px; border:1px solid var(--border); color:var(--sub);
+  }
+  .license-strip .pill.trial{border-color:var(--accent); color:var(--accent);}
+  .license-strip .pill.expired{border-color:#c0564a; color:#e0685a;}
+  .license-strip .pill.licensed{border-color:var(--accent2); color:var(--accent2);}
+  .license-strip .spacer{flex:1;}
+  .license-strip a{color:var(--sub); font-size:12px; cursor:pointer; text-decoration:underline;}
+  .license-strip a:hover{color:var(--text);}
+
+  .license-panel{
+    display:none; margin:0 0 18px; padding:20px; background:var(--panel);
+    border:1px solid var(--accent); border-radius:10px;
+  }
+  .license-panel h3{margin:0 0 6px; font-size:15px;}
+  .license-panel p{margin:0 0 14px; color:var(--sub); font-size:13px;}
+  .license-row{display:flex; gap:10px; flex-wrap:wrap;}
+  .license-row input{
+    flex:1; min-width:220px; padding:10px 12px; background:var(--panel2); border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-family:var(--mono); font-size:13px;
+  }
+  .license-row input:focus{outline:none; border-color:var(--accent);}
+  .btn-buy{
+    display:inline-flex; align-items:center; padding:10px 18px; background:var(--accent2); color:#1a1204;
+    border:none; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer; text-decoration:none;
+  }
+  .btn-activate{
+    padding:10px 18px; background:var(--panel2); color:var(--text);
+    border:1px solid var(--border); border-radius:8px; font-size:13px; cursor:pointer;
+  }
+  .btn-activate:hover{border-color:var(--accent);}
+  .license-msg{margin-top:10px; font-size:12.5px;}
+  .license-msg.err{color:#e0685a;}
+  .license-msg.ok{color:var(--accent);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>StockAudit</h1>
+  <div class="tag">Audit your XML against your StockSilo download log and export a licensing-ready workbook. Runs entirely in this app — nothing uploads anywhere.</div>
+
+  <div class="license-strip" id="licenseStrip">
+    <span class="pill" id="licensePill"></span>
+    <span id="licenseNote"></span>
+    <span class="spacer"></span>
+    <a id="licenseLink"></a>
+  </div>
+
+  <div class="license-panel" id="licensePanel">
+    <h3 id="licPanelTitle">Activate StockAudit</h3>
+    <p id="licPanelBody">Paste the license key from your purchase email below, or buy a license to keep saving workbooks.</p>
+    <div class="license-row">
+      <input type="text" id="licenseKeyInput" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX" spellcheck="false" autocomplete="off">
+      <button class="btn-activate" id="activateBtn">Activate</button>
+      <a class="btn-buy" id="buyBtn" href="#" target="_blank" rel="noopener">Buy License — $19</a>
+    </div>
+    <div class="license-msg" id="licenseMsg"></div>
+  </div>
+
+  <div class="step">
+    <h2><span class="n">1</span>Timeline XML</h2>
+    <div class="drop" id="dropXml">Drop a Premiere Pro XMEML export here, or click to choose a file
+      <input type="file" id="xmlInput" accept=".xml">
+    </div>
+    <div id="xmlPill"></div>
+  </div>
+
+  <div class="step">
+    <h2><span class="n">2</span>Download log</h2>
+    <div class="drop" id="dropCsv">Drop your stock download log (.csv, .xlsx) here, or click to choose a file
+      <input type="file" id="csvInput" accept=".csv,.xlsx,.xls">
+    </div>
+    <div id="csvPill"></div>
+    <div id="mapBox" class="hidden">
+      <div class="hint">Detected columns below — adjust if they're wrong before processing.</div>
+      <div class="mapgrid">
+        <div><label>File name column</label><select id="mapName"></select></div>
+        <div><label>Source site column</label><select id="mapSite"></select></div>
+        <div><label>Source URL column</label><select id="mapUrl"></select></div>
+        <div><label>Saved-to / path column</label><select id="mapPath"></select></div>
+        <div><label>Date column (optional)</label><select id="mapDate"></select></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <h2><span class="n">3</span>Options</h2>
+    <div class="opts">
+      <div class="optrow"><input type="checkbox" id="optDisabled"><div><div>Include disabled clips</div><div class="desc">Off by default — disabled clips aren't in the final cut.</div></div></div>
+      <div class="optrow"><input type="checkbox" id="optLinkedAudio" checked><div><div>Filter synced/linked audio</div><div class="desc">Avoids double-counting a video clip's own embedded audio track.</div></div></div>
+      <div class="optrow"><input type="checkbox" id="optFlag" checked><div><div>Flag likely stock in non-matched media</div><div class="desc">Heuristic name-matching against common stock sites — always double-check flagged rows.</div></div></div>
+    </div>
+    <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
+      <div style="font-size:13px; margin-bottom:2px;">When a clip is reused, what counts as its "Total Used"?</div>
+      <div class="desc" style="margin-bottom:10px;">Both figures are always in the export — this just picks which one drives the Summary totals and the sort order below.</div>
+      <label style="display:flex; gap:8px; align-items:flex-start; font-size:13px; margin-bottom:8px; cursor:pointer;">
+        <input type="radio" name="totalBasis" id="optUniqueRadio" checked style="margin-top:3px;">
+        <span><b>Unique frames only</b><br><span class="desc">If the same stretch of source footage is reused (e.g. a clip is cut in twice, overlapping the same in/out range), it's counted once — not double-billed.</span></span>
+      </label>
+      <label style="display:flex; gap:8px; align-items:flex-start; font-size:13px; cursor:pointer;">
+        <input type="radio" name="totalBasis" id="optSumRadio" style="margin-top:3px;">
+        <span><b>Sum of every use</b><br><span class="desc">Adds up the duration of each individual instance on the timeline, even if two uses overlap the same source frames.</span></span>
+      </label>
+    </div>
+    <button class="primary" id="processBtn" disabled>Process timeline</button>
+    <div class="warn hidden" id="errBox"></div>
+  </div>
+
+  <div class="step hidden" id="resultsBox">
+    <h2><span class="n">✓</span>Results</h2>
+    <div class="summary" id="summaryCards"></div>
+    <button class="primary" id="downloadBtn">Save workbook (.xlsx)</button>
+    <div class="hint" id="saveStatus" style="display:none;"></div>
+    <div class="hint"><span style="display:inline-block;width:10px;height:10px;background:var(--accent2);border-radius:2px;vertical-align:middle;margin-right:6px;"></span>Amber rows are flagged as likely stock — same highlighting carries into the downloaded workbook.</div>
+    <div id="previewTables"></div>
+  </div>
+
+  <div class="footnote">Stock-site and music-license flags are pattern-based guesses from file naming conventions — verify before invoicing.</div>
+</div>
+
+<script>
+// ---------- helpers ----------
+function directChildren(el, tag){ return el ? Array.from(el.children).filter(c=>c.tagName===tag) : []; }
+function childText(el, tag){ const c = directChildren(el, tag)[0]; return c ? c.textContent.trim() : null; }
+function decodePath(p){ try{ return decodeURIComponent(p); }catch(e){ return p; } }
+function baseName(p){ if(!p) return ''; const parts = p.split(/[\\/]/); return parts[parts.length-1]; }
+
+function formatTC(frames, fps){
+  frames = Math.max(0, Math.round(frames));
+  const ff = frames % fps;
+  const totalSec = Math.floor(frames / fps);
+  const ss = totalSec % 60;
+  const mm = Math.floor(totalSec/60) % 60;
+  const hh = Math.floor(totalSec/3600);
+  const p2 = n => String(n).padStart(2,'0');
+  return `${p2(hh)}:${p2(mm)}:${p2(ss)}:${p2(ff)}`;
+}
+
+function mergeIntervals(pairs){
+  const sorted = pairs.filter(p=>p[1]>p[0]).sort((a,b)=>a[0]-b[0]);
+  const out = [];
+  for(const [s,e] of sorted){
+    if(out.length && s <= out[out.length-1][1]){
+      out[out.length-1][1] = Math.max(out[out.length-1][1], e);
+    } else out.push([s,e]);
+  }
+  return out;
+}
+function sumLen(intervals){ return intervals.reduce((a,[s,e])=>a+(e-s),0); }
+
+// simple normalized levenshtein similarity, 0..1
+function similarity(a,b){
+  a=a.toLowerCase(); b=b.toLowerCase();
+  if(a===b) return 1;
+  const m=a.length, n=b.length;
+  if(!m||!n) return 0;
+  const dp = Array.from({length:m+1},()=>new Array(n+1).fill(0));
+  for(let i=0;i<=m;i++) dp[i][0]=i;
+  for(let j=0;j<=n;j++) dp[0][j]=j;
+  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++){
+    dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j-1],dp[i-1][j],dp[i][j-1]);
+  }
+  const dist = dp[m][n];
+  return 1 - dist/Math.max(m,n);
+}
+
+// ---------- stock name heuristics ----------
+const STOCK_VIDEO_PATTERNS = [
+  [/-SBV-\d+/i, 'Storyblocks'],
+  [/storyblocks/i, 'Storyblocks'],
+  [/^\d{6,9}-.+/i, 'Pond5 (numeric ID)'],
+  [/pond5/i, 'Pond5'],
+  [/^shutterstock_\d+/i, 'Shutterstock'],
+  [/shutterstock/i, 'Shutterstock'],
+  [/^adobestock_\d+/i, 'Adobe Stock'],
+  [/^istockphoto-\d+/i, 'iStock'],
+  [/gettyimages/i, 'Getty Images'],
+  [/_artlist(_|$|\.)/i, 'Artlist'],
+  [/artgrid/i, 'Artgrid'],
+  [/videohive/i, 'VideoHive / Envato'],
+  [/motionarray/i, 'Motion Array'],
+  [/depositphotos/i, 'Depositphotos'],
+  [/videvo/i, 'Videvo'],
+  [/pexels/i, 'Pexels'],
+  [/pixabay/i, 'Pixabay'],
+  [/^\d{5,10}\.\w+$/i, 'Possible stock (bare numeric filename)'],
+];
+const STOCK_AUDIO_PATTERNS = [
+  [/epidemicsound|epidemic_sound|\bES_/i, 'Epidemic Sound'],
+  [/audiojungle/i, 'AudioJungle'],
+  [/premiumbeat/i, 'PremiumBeat'],
+  [/soundstripe/i, 'Soundstripe'],
+  [/artlist/i, 'Artlist Music'],
+  [/artgrid/i, 'Artgrid'],
+  [/^\d+_[a-z_]+_by_[a-z_]+/i, 'Licensed music (Artist_Title_by_X pattern)'],
+  [/uppbeat/i, 'Uppbeat'],
+];
+function detectStock(name, patterns){
+  for(const [re,label] of patterns){ if(re.test(name)) return label; }
+  return null;
+}
+
+// ---------- XML parsing ----------
+function parseXmeml(text){
+  const doc = new DOMParser().parseFromString(text, 'text/xml');
+  const perr = doc.querySelector('parsererror');
+  if(perr) throw new Error('Could not parse XML — is this a valid Premiere XMEML export?');
+
+  const sequences = Array.from(doc.getElementsByTagName('sequence'));
+  if(!sequences.length) throw new Error('No <sequence> found in this XML.');
+
+  let timebase = 24;
+  const rateEl = directChildren(sequences[0],'rate')[0];
+  if(rateEl){ const tb = childText(rateEl,'timebase'); if(tb) timebase = parseFloat(tb) || 24; }
+
+  const fileRegistry = new Map();
+  const clipitems = new Map();
+
+  function walkTrackGroup(mediaEl, kind){
+    if(!mediaEl) return;
+    const tracks = directChildren(mediaEl,'track');
+    tracks.forEach((track, tIdx)=>{
+      const items = directChildren(track,'clipitem');
+      items.forEach(el=>{
+        const id = el.getAttribute('id');
+        if(!id || clipitems.has(id)) return;
+        const name = childText(el,'name') || '(unnamed clip)';
+        const enabled = childText(el,'enabled') !== 'FALSE';
+        const start = parseFloat(childText(el,'start')) || 0;
+        const end = parseFloat(childText(el,'end')) || 0;
+        const inPt = parseFloat(childText(el,'in')) || 0;
+        const outPt = parseFloat(childText(el,'out')) || 0;
+        const masterclipid = childText(el,'masterclipid') || id;
+
+        let fileName = name, filePath = null;
+        const fileEl = directChildren(el,'file')[0];
+        if(fileEl){
+          const fid = fileEl.getAttribute('id');
+          const nEl = directChildren(fileEl,'name')[0];
+          const pEl = directChildren(fileEl,'pathurl')[0];
+          if(nEl){
+            fileName = nEl.textContent.trim();
+            filePath = pEl ? decodePath(pEl.textContent.trim()) : null;
+            if(fid) fileRegistry.set(fid, {name:fileName, path:filePath});
+          } else if(fid && fileRegistry.has(fid)){
+            const reg = fileRegistry.get(fid);
+            fileName = reg.name; filePath = reg.path;
+          }
+        }
+
+        const links = directChildren(el,'link').map(l=>({
+          ref: childText(l,'linkclipref'),
+          mediatype: childText(l,'mediatype')
+        }));
+
+        clipitems.set(id, {
+          id, name, fileName, filePath, enabled, start, end, in:inPt, out:outPt,
+          masterclipid, links, trackType:kind, trackIndex:tIdx
+        });
+      });
+    });
+  }
+
+  sequences.forEach(seq=>{
+    const mediaEl = directChildren(seq,'media')[0];
+    if(!mediaEl) return;
+    walkTrackGroup(directChildren(mediaEl,'video')[0], 'video');
+    walkTrackGroup(directChildren(mediaEl,'audio')[0], 'audio');
+  });
+
+  return { timebase, clipitems };
+}
+
+// ---------- build tally groups ----------
+function buildGroups(parsed, opts){
+  const { timebase, clipitems } = parsed;
+  const all = Array.from(clipitems.values());
+
+  const linkedToVideo = new Set();
+  all.forEach(ci=>{
+    if(ci.trackType==='audio' && ci.links.some(l=>l.mediatype==='video')) linkedToVideo.add(ci.id);
+  });
+
+  const instances = [];
+  for(const ci of all){
+    if(!opts.includeDisabled && !ci.enabled) continue;
+    if(ci.trackType==='audio' && opts.filterLinkedAudio && linkedToVideo.has(ci.id)) continue;
+    const category = (ci.trackType==='audio' && !linkedToVideo.has(ci.id)) ? 'audio' : 'video';
+    instances.push({...ci, category});
+  }
+
+  const groups = new Map();
+  for(const inst of instances){
+    const key = (inst.filePath || inst.fileName || inst.name).toLowerCase();
+    if(!groups.has(key)){
+      groups.set(key, {
+        fileName: inst.fileName, filePath: inst.filePath, category: inst.category,
+        masterclipid: inst.masterclipid, instances: [], anyDisabled:false
+      });
+    }
+    const g = groups.get(key);
+    g.instances.push(inst);
+    if(!inst.enabled) g.anyDisabled = true;
+    if(inst.category==='video') g.category = 'video'; // video presence wins the label
+  }
+
+  for(const g of groups.values()){
+    const naive = g.instances.reduce((a,i)=>a+Math.max(0,i.out-i.in),0);
+    const merged = mergeIntervals(g.instances.map(i=>[i.in,i.out]));
+    const unique = sumLen(merged);
+    g.naiveFrames = naive;
+    g.uniqueFrames = unique;
+    g.timesUsed = g.instances.length;
+    g.timebase = timebase;
+  }
+  return { groups: Array.from(groups.values()), timebase };
+}
+
+// ---------- CSV/XLSX log parsing ----------
+let logRows = null, logHeaders = null;
+function guessCol(headers, keywords){
+  const lower = headers.map(h=>String(h).toLowerCase());
+  for(const kw of keywords){
+    const idx = lower.findIndex(h=>h.includes(kw));
+    if(idx>-1) return headers[idx];
+  }
+  return headers[0] || '';
+}
+function loadLogFile(file){
+  const reader = new FileReader();
+  reader.onload = e=>{
+    const wb = XLSX.read(e.target.result, {type:'binary'});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+    if(!rows.length){ showErr('The download log looks empty.'); return; }
+    logHeaders = rows[0].map(h=>String(h).trim());
+    logRows = rows.slice(1).map(r=>{
+      const o = {};
+      logHeaders.forEach((h,i)=>o[h]=r[i]!==undefined?String(r[i]).trim():'');
+      return o;
+    });
+    populateMapSelects();
+    document.getElementById('mapBox').classList.remove('hidden');
+    document.getElementById('csvPill').innerHTML =
+      `<div class="filepill"><span class="dot"></span>${file.name} — ${logRows.length} rows</div>`;
+    checkReady();
+  };
+  reader.readAsBinaryString(file);
+}
+function populateMapSelects(){
+  const sels = {
+    mapName: guessCol(logHeaders,['file name','filename','file']),
+    mapSite: guessCol(logHeaders,['site','source','vendor','provider']),
+    mapUrl: guessCol(logHeaders,['source page','url','link']),
+    mapPath: guessCol(logHeaders,['saved to','path','folder','destination']),
+    mapDate: guessCol(logHeaders,['date'])
+  };
+  Object.entries(sels).forEach(([id,guess])=>{
+    const sel = document.getElementById(id);
+    sel.innerHTML = (id==='mapDate' ? ['(none)',...logHeaders] : logHeaders)
+      .map(h=>`<option ${h===guess?'selected':''}>${h}</option>`).join('');
+  });
+}
+
+// ---------- XML file loading ----------
+let xmlParsed = null;
+function loadXmlFile(file){
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      xmlParsed = parseXmeml(e.target.result);
+      document.getElementById('xmlPill').innerHTML =
+        `<div class="filepill"><span class="dot"></span>${file.name} — ${xmlParsed.clipitems.size} clip instances, ${xmlParsed.timebase}fps</div>`;
+      checkReady();
+    }catch(err){ showErr(err.message); }
+  };
+  reader.readAsText(file);
+}
+
+function showErr(msg){ const b=document.getElementById('errBox'); b.textContent=msg; b.classList.remove('hidden'); }
+function clearErr(){ document.getElementById('errBox').classList.add('hidden'); }
+function checkReady(){ document.getElementById('processBtn').disabled = !(xmlParsed && logRows); }
+
+// ---------- wire up drop zones ----------
+function wireDrop(dropId, inputId, onFile){
+  const drop = document.getElementById(dropId), input = document.getElementById(inputId);
+  drop.addEventListener('click', ()=>input.click());
+  input.addEventListener('change', ()=>{ if(input.files[0]) onFile(input.files[0]); });
+  ['dragover','dragleave','drop'].forEach(evt=>{
+    drop.addEventListener(evt, e=>{
+      e.preventDefault();
+      if(evt==='dragover') drop.classList.add('over');
+      else drop.classList.remove('over');
+    });
+  });
+  drop.addEventListener('drop', e=>{ if(e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]); });
+}
+wireDrop('dropXml','xmlInput', loadXmlFile);
+wireDrop('dropCsv','csvInput', loadLogFile);
+
+// ---------- matching ----------
+function matchToLog(fileName){
+  const target = fileName.toLowerCase().trim();
+  const nameCol = document.getElementById('mapName').value;
+  let best = null, bestScore = 0;
+  for(const row of logRows){
+    const cand = (row[nameCol]||'').toLowerCase().trim();
+    if(!cand) continue;
+    if(cand === target) return { row, confidence:'exact' };
+    const candNoExt = cand.replace(/\.[a-z0-9]+$/,'');
+    const targetNoExt = target.replace(/\.[a-z0-9]+$/,'');
+    if(candNoExt === targetNoExt) return { row, confidence:'exact' };
+    const score = similarity(candNoExt, targetNoExt);
+    if(score > bestScore){ bestScore = score; best = row; }
+  }
+  if(best && bestScore >= 0.88) return { row:best, confidence:'fuzzy' };
+  return null;
+}
+
+// ---------- Licensing ----------
+const licenseStrip = document.getElementById('licenseStrip');
+const licensePill = document.getElementById('licensePill');
+const licenseNote = document.getElementById('licenseNote');
+const licenseLink = document.getElementById('licenseLink');
+const licensePanel = document.getElementById('licensePanel');
+const licenseKeyInput = document.getElementById('licenseKeyInput');
+const activateBtn = document.getElementById('activateBtn');
+const buyBtn = document.getElementById('buyBtn');
+const licenseMsg = document.getElementById('licenseMsg');
+let licenseState = { licensed: false, trialRemaining: 5, trialLimit: 5, buyUrl: '#' };
+
+function renderLicense(){
+  licenseStrip.style.display = 'flex';
+  buyBtn.href = licenseState.buyUrl || '#';
+  if(licenseState.licensed){
+    licensePill.textContent = 'LICENSED ✓';
+    licensePill.className = 'pill licensed';
+    licenseNote.textContent = licenseState.customerEmail ? `Registered to ${licenseState.customerEmail}` : 'Thanks for supporting StockAudit!';
+    licenseLink.textContent = 'Deactivate this device';
+    licenseLink.onclick = deactivateLicense;
+    licensePanel.style.display = 'none';
+  } else if(licenseState.trialRemaining > 0){
+    licensePill.textContent = 'FREE TRIAL';
+    licensePill.className = 'pill trial';
+    licenseNote.textContent = `${licenseState.trialRemaining} of ${licenseState.trialLimit} workbook save${licenseState.trialLimit===1?'':'s'} left`;
+    licenseLink.textContent = 'Have a license key?';
+    licenseLink.onclick = () => { licensePanel.style.display = 'block'; licenseKeyInput.focus(); };
+    licensePanel.style.display = 'none';
+  } else {
+    licensePill.textContent = 'TRIAL FINISHED';
+    licensePill.className = 'pill expired';
+    licenseNote.textContent = 'Buy a license to keep saving workbooks.';
+    licenseLink.textContent = '';
+    licenseLink.onclick = null;
+    licensePanel.style.display = 'block';
+  }
+}
+
+async function refreshLicense(){
+  licenseState = await window.stockAudit.getLicenseStatus();
+  renderLicense();
+}
+
+async function activateLicense(){
+  licenseMsg.textContent = 'Activating…';
+  licenseMsg.className = 'license-msg';
+  activateBtn.disabled = true;
+  try {
+    const res = await window.stockAudit.activateLicense(licenseKeyInput.value);
+    if(res.ok){
+      licenseState = res.status;
+      licenseMsg.textContent = 'Activated — thank you!';
+      licenseMsg.className = 'license-msg ok';
+      licenseKeyInput.value = '';
+      renderLicense();
+    } else {
+      licenseMsg.textContent = res.error || 'Activation failed.';
+      licenseMsg.className = 'license-msg err';
+    }
+  } catch (err) {
+    licenseMsg.textContent = 'Could not reach the license server. Check your connection and try again.';
+    licenseMsg.className = 'license-msg err';
+  }
+  activateBtn.disabled = false;
+}
+
+async function deactivateLicense(){
+  if(!confirm('Deactivate the license on this device? You can re-activate later with the same key.')) return;
+  const res = await window.stockAudit.deactivateLicense();
+  if(res.status) licenseState = res.status;
+  renderLicense();
+}
+
+activateBtn.addEventListener('click', activateLicense);
+licenseKeyInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') activateLicense(); });
+refreshLicense();
+
+// ---------- main process ----------
+let lastResult = null;
+document.getElementById('processBtn').addEventListener('click', ()=>{
+  clearErr();
+  const opts = {
+    includeDisabled: document.getElementById('optDisabled').checked,
+    filterLinkedAudio: document.getElementById('optLinkedAudio').checked,
+    useUnique: document.getElementById('optUniqueRadio').checked,
+    flagStock: document.getElementById('optFlag').checked
+  };
+  const { groups, timebase } = buildGroups(xmlParsed, opts);
+  const siteCol = document.getElementById('mapSite').value;
+  const urlCol = document.getElementById('mapUrl').value;
+  const pathCol = document.getElementById('mapPath').value;
+  const dateCol = document.getElementById('mapDate').value;
+
+  const footage = [], music = [], nonStock = [];
+
+  for(const g of groups){
+    const match = matchToLog(g.fileName);
+    const totalTC = formatTC(g.naiveFrames, timebase);
+    const uniqueTC = formatTC(g.uniqueFrames, timebase);
+    const totalSec = +(g.naiveFrames/timebase).toFixed(2);
+    const uniqueSec = +(g.uniqueFrames/timebase).toFixed(2);
+
+    if(match){
+      const row = match.row;
+      const rec = {
+        'Clip / Cue Name': g.fileName,
+        'Matched Confidence': match.confidence,
+        'Source Site': row[siteCol]||'',
+        'Source URL': row[urlCol]||'',
+        'Saved To': row[pathCol]||'',
+        'Download Date': dateCol!=='(none)' ? (row[dateCol]||'') : '',
+        'Times Used': g.timesUsed,
+        'Total Duration (TC)': totalTC,
+        'Total Duration (sec)': totalSec,
+        'Unique Duration (TC)': uniqueTC,
+        'Unique Duration (sec)': uniqueSec,
+        'Primary Total Used': opts.useUnique ? uniqueSec : totalSec,
+        'Timeline File Path': g.filePath || ''
+      };
+      if(g.category==='audio') music.push({...rec, 'Likely Stock Music':'—', 'Flag Note':'Matched in download log'});
+      else footage.push(rec);
+    } else if(g.category==='audio'){
+      const flag = opts.flagStock ? detectStock(g.fileName, STOCK_AUDIO_PATTERNS) : null;
+      music.push({
+        'Clip / Cue Name': g.fileName,
+        'Matched Confidence': 'unmatched',
+        'Source Site': '', 'Source URL': '', 'Saved To': '', 'Download Date': '',
+        'Times Used': g.timesUsed,
+        'Total Duration (TC)': totalTC, 'Total Duration (sec)': totalSec,
+        'Unique Duration (TC)': uniqueTC, 'Unique Duration (sec)': uniqueSec,
+        'Primary Total Used': opts.useUnique ? uniqueSec : totalSec,
+        'Likely Stock Music': flag ? 'Yes' : 'No',
+        'Flag Note': flag || '',
+        'Timeline File Path': g.filePath || ''
+      });
+    } else {
+      const flag = opts.flagStock ? detectStock(g.fileName, STOCK_VIDEO_PATTERNS) : null;
+      nonStock.push({
+        'Clip Name': g.fileName,
+        'Any Disabled Instance': g.anyDisabled ? 'Yes' : 'No',
+        'Times Used': g.timesUsed,
+        'Total Duration (TC)': totalTC, 'Total Duration (sec)': totalSec,
+        'Unique Duration (TC)': uniqueTC, 'Unique Duration (sec)': uniqueSec,
+        'Likely Stock Flag': flag ? 'Yes' : 'No',
+        'Guessed Source': flag || '',
+        'Timeline File Path': g.filePath || ''
+      });
+    }
+  }
+
+  [footage, music, nonStock].forEach(arr=>arr.sort((a,b)=>
+    (b['Primary Total Used']||b['Total Duration (sec)']||0) - (a['Primary Total Used']||a['Total Duration (sec)']||0)
+  ));
+
+  lastResult = { footage, music, nonStock, opts, timebase };
+  renderResults(lastResult);
+});
+
+// Shared by both the results preview table and the workbook export — a row counts
+// as "flagged" if either the stock-footage or stock-music heuristic caught it.
+function isFlaggedRow(r){ return r['Likely Stock Flag']==='Yes' || r['Likely Stock Music']==='Yes'; }
+
+function renderResults(res){
+  const box = document.getElementById('resultsBox');
+  box.classList.remove('hidden');
+  const totalFootageSec = res.footage.reduce((a,r)=>a+r['Primary Total Used'],0);
+  const totalMusicSec = res.music.reduce((a,r)=>a+r['Primary Total Used'],0);
+  document.getElementById('summaryCards').innerHTML = `
+    <div class="card"><div class="num">${res.footage.length}</div><div class="lab">Stock clips matched</div></div>
+    <div class="card"><div class="num">${res.music.length}</div><div class="lab">Music / audio cues</div></div>
+    <div class="card"><div class="num">${res.nonStock.length}</div><div class="lab">Non-stock media</div></div>
+    <div class="card"><div class="num">${formatTC(totalFootageSec*res.timebase, res.timebase)}</div><div class="lab">Total stock footage used</div></div>
+  `;
+
+  function tbl(title, rows, cols){
+    if(!rows.length) return `<h3 style="font-size:13px;color:var(--sub);margin:22px 0 4px;">${title} — none found</h3>`;
+    const shown = rows.slice(0,8);
+    return `<h3 style="font-size:13px;color:var(--sub);margin:22px 0 4px;">${title} (${rows.length}${rows.length>8?', showing 8':''})</h3>
+      <table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>
+      ${shown.map(r=>`<tr class="${isFlaggedRow(r)?'row-flagged':''}">${cols.map(c=>{
+        const v = r[c];
+        const cls = (c==='Likely Stock Flag'||c==='Likely Stock Music') ? (v==='Yes'?'flag-yes':'flag-no') : '';
+        return `<td class="${cls}">${v!==undefined?v:''}</td>`;
+      }).join('')}</tr>`).join('')}
+      </tbody></table>`;
+  }
+  document.getElementById('previewTables').innerHTML =
+    tbl('Stock footage used', res.footage, ['Clip / Cue Name','Source Site','Times Used','Total Duration (TC)','Unique Duration (TC)']) +
+    tbl('Music cue sheet', res.music, ['Clip / Cue Name','Source Site','Likely Stock Music','Times Used','Total Duration (TC)']) +
+    tbl('Non-stock media', res.nonStock, ['Clip Name','Likely Stock Flag','Guessed Source','Times Used','Total Duration (TC)']);
+}
+
+document.getElementById('downloadBtn').addEventListener('click', async ()=>{
+  if(!lastResult) return;
+  const statusEl = document.getElementById('saveStatus');
+  const btn = document.getElementById('downloadBtn');
+  const prevLabel = btn.textContent;
+
+  btn.disabled = true;
+  btn.textContent = 'Building workbook…';
+  statusEl.style.display = 'block';
+  statusEl.textContent = '';
+
+  try {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'StockAudit';
+    wb.created = new Date();
+
+    const FLAG_FILL = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF6DFC0'} };
+    const HEADER_FILL = { type:'pattern', pattern:'solid', fgColor:{argb:'FF2B3238'} };
+    const HEADER_FONT = { bold:true, color:{argb:'FFE6E9EC'} };
+
+    function addSheet(name, rows, cols){
+      const ws = wb.addWorksheet(name);
+      ws.columns = cols.map(c=>({ header:c, key:c, width: Math.max(14, Math.min(42, c.length+6)) }));
+      ws.getRow(1).eachCell(cell=>{ cell.fill = HEADER_FILL; cell.font = HEADER_FONT; });
+      ws.views = [{ state:'frozen', ySplit:1 }];
+      rows.forEach(r=>{
+        const row = ws.addRow(cols.map(c=>r[c]));
+        if(isFlaggedRow(r)) row.eachCell(cell=>{ cell.fill = FLAG_FILL; });
+      });
+      return ws;
+    }
+
+    const footageCols = ['Clip / Cue Name','Matched Confidence','Source Site','Source URL','Saved To','Download Date',
+      'Times Used','Total Duration (TC)','Total Duration (sec)','Unique Duration (TC)','Unique Duration (sec)','Timeline File Path'];
+    const musicCols = ['Clip / Cue Name','Matched Confidence','Source Site','Source URL','Saved To','Download Date',
+      'Times Used','Total Duration (TC)','Total Duration (sec)','Unique Duration (TC)','Unique Duration (sec)',
+      'Likely Stock Music','Flag Note','Timeline File Path'];
+    const nonStockCols = ['Clip Name','Any Disabled Instance','Times Used','Total Duration (TC)','Total Duration (sec)',
+      'Unique Duration (TC)','Unique Duration (sec)','Likely Stock Flag','Guessed Source','Timeline File Path'];
+
+    addSheet('Stock Footage Used', lastResult.footage, footageCols);
+    addSheet('Music Cue Sheet', lastResult.music, musicCols);
+    addSheet('Non-Stock Media', lastResult.nonStock, nonStockCols);
+
+    const totalFootageSec = lastResult.footage.reduce((a,r)=>a+r['Primary Total Used'],0);
+    const totalMusicSec = lastResult.music.reduce((a,r)=>a+r['Primary Total Used'],0);
+    const opts = lastResult.opts;
+    const wsSummary = wb.addWorksheet('Summary');
+    wsSummary.columns = [{width:40},{width:30}];
+    const summaryRows = [
+      ['Generated', new Date().toLocaleString()],
+      ['Sequence frame rate', lastResult.timebase + ' fps'],
+      ['Duration basis', opts.useUnique ? 'Unique frames (overlapping re-use counted once)' : 'Sum of every use (overlaps counted each time)'],
+      ['Disabled clips included', opts.includeDisabled ? 'Yes' : 'No'],
+      ['Linked audio filtered', opts.filterLinkedAudio ? 'Yes' : 'No'],
+      [],
+      ['Stock clips matched', lastResult.footage.length],
+      ['Music / audio cues', lastResult.music.length],
+      ['Non-stock media items', lastResult.nonStock.length],
+      [],
+      ['Total stock footage duration used (sec)', totalFootageSec.toFixed(2)],
+      ['Total stock footage duration used (TC)', formatTC(totalFootageSec*lastResult.timebase, lastResult.timebase)],
+      ['Total music duration used (sec)', totalMusicSec.toFixed(2)],
+      ['Total music duration used (TC)', formatTC(totalMusicSec*lastResult.timebase, lastResult.timebase)],
+    ];
+    summaryRows.forEach(r=> wsSummary.addRow(r.length?r:['','']));
+
+    const buf = await wb.xlsx.writeBuffer();
+
+    btn.textContent = 'Saving…';
+    // buf is an ArrayBuffer-backed value from ExcelJS; pass it straight
+    // through the context bridge to main, which shows the native Save As
+    // dialog and writes the file — after checking the trial/license state.
+    const result = await window.stockAudit.saveWorkbook(buf, 'stock_audit_report.xlsx');
+    if (result.trialExhausted) {
+      licenseState = result.status;
+      renderLicense();
+      statusEl.textContent = 'Your free trial is finished — activate a license to keep saving.';
+    } else if (result.canceled) {
+      statusEl.textContent = 'Save canceled.';
+    } else {
+      statusEl.textContent = `Saved to ${result.filePath}`;
+      if (result.status) { licenseState = result.status; renderLicense(); }
+    }
+  } catch (err) {
+    statusEl.textContent = `Couldn't save the workbook: ${err.message}`;
+    console.error('Save workbook failed:', err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevLabel;
+  }
+});
+</script>
+</body>
+</html>

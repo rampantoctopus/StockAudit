@@ -1,0 +1,45 @@
+{
+  "name": "stockaudit",
+  "version": "1.1.2",
+  "description": "Audit your XML against your StockSilo download log and export a licensing-ready workbook.",
+  "main": "main.js",
+  "author": "RampantOctopus Softworks",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.mjo.stockaudit",
+    "productName": "StockAudit",
+    "copyright": "Copyright © 2026 RampantOctopus Softworks",
+    "files": ["main.js", "preload.js", "app/**/*", "lib/**/*", "build/icon.png"],
+    "afterPack": "scripts/afterPack.js",
+    "mac": {
+      "icon": "build/icon.icns",
+      "category": "public.app-category.video",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "gatekeeperAssess": false,
+      "notarize": { "teamId": "2B67R2996C" },
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] },
+        { "target": "zip", "arch": ["arm64", "x64"] }
+      ]
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": ["nsis", "portable"]
+    },
+    "linux": {
+      "icon": "build/icons",
+      "target": ["AppImage"]
+    }
+  }
+}
