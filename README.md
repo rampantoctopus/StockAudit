@@ -34,6 +34,17 @@ This uses `electron-builder` to produce a distributable in `dist/`:
 
 You only need to build for the platform(s) you'll actually use.
 
+### Windows builds run in CI, not locally on this Mac
+
+`npm run dist` only builds for the platform it's run on, and this Mac has no
+Wine installed, so it can't cross-compile the Windows NSIS/portable targets.
+Instead, `.github/workflows/windows-build.yml` builds them natively on a
+`windows-latest` GitHub Actions runner:
+- Trigger manually from the Actions tab (`workflow_dispatch`), or push a
+  version tag (`git tag v1.1.2 && git push --tags`) to also draft a GitHub
+  Release with the `.exe` files attached.
+- Output lands as a downloadable workflow artifact either way.
+
 ### First launch on macOS (unsigned builds only)
 
 If you build without signing env vars set (see **Code signing & notarization**
