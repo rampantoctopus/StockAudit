@@ -39,11 +39,13 @@
   .drop input{display:none;}
   .filepill{
     display:inline-flex; align-items:center; gap:8px; background:var(--panel2); border:1px solid var(--border);
-    border-radius:20px; padding:5px 12px 5px 10px; font-size:12.5px; margin-top:10px;
+    border-radius:20px; padding:5px 10px 5px 10px; font-size:12.5px; margin-top:8px; margin-right:8px;
   }
   .filepill .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
-  .mapgrid{display:grid; grid-template-columns:1fr 1fr; gap:12px 20px; margin-top:16px;}
-  .mapgrid label{font-size:12px; color:var(--sub); display:block; margin-bottom:4px;}
+  .filepill .pill-remove{
+    cursor:pointer; color:var(--sub); font-size:11px; padding:2px 5px; border-radius:50%; margin-left:2px;
+  }
+  .filepill .pill-remove:hover{color:#e0685a; background:rgba(224,104,90,.12);}
   select, input[type=text]{
     width:100%; background:var(--panel2); border:1px solid var(--border); color:var(--text);
     border-radius:6px; padding:8px 10px; font-size:13px;
@@ -153,21 +155,12 @@
   </div>
 
   <div class="step">
-    <h2><span class="n">2</span>Download log</h2>
-    <div class="drop" id="dropCsv">Drop your stock download log (.csv, .xlsx) here, or click to choose a file
-      <input type="file" id="csvInput" accept=".csv,.xlsx,.xls">
+    <h2><span class="n">2</span>Download logs</h2>
+    <div class="drop" id="dropCsv">Drop one or more download logs here (.csv, .xlsx) — StockSilo, SoundSilo, or similar — or click to choose files
+      <input type="file" id="csvInput" accept=".csv,.xlsx,.xls" multiple>
     </div>
-    <div id="csvPill"></div>
-    <div id="mapBox" class="hidden">
-      <div class="hint">Detected columns below — adjust if they're wrong before processing.</div>
-      <div class="mapgrid">
-        <div><label>File name column</label><select id="mapName"></select></div>
-        <div><label>Source site column</label><select id="mapSite"></select></div>
-        <div><label>Source URL column</label><select id="mapUrl"></select></div>
-        <div><label>Saved-to / path column</label><select id="mapPath"></select></div>
-        <div><label>Date column (optional)</label><select id="mapDate"></select></div>
-      </div>
-    </div>
+    <div id="csvPillList"></div>
+    <div class="hint">Columns are auto-detected per file, including composer/publisher/ISRC when a log provides them (e.g. SoundSilo's Universal Production Music metadata).</div>
   </div>
 
   <div class="step">
@@ -221,6 +214,26 @@ function formatTC(frames, fps){
   const hh = Math.floor(totalSec/3600);
   const p2 = n => String(n).padStart(2,'0');
   return `${p2(hh)}:${p2(mm)}:${p2(ss)}:${p2(ff)}`;
+}
+
+// CSV/XLSX-reading libraries often silently type-infer a date-looking cell
+// (e.g. "2026-06-02") into an Excel serial date number during parsing, with
+// no reliable formatting metadata to convert it back automatically for a
+// plain CSV. Left alone, that shows up as a meaningless number like 46176
+// in the exported workbook. This detects that case and converts it back to
+// a human date; anything that isn't a bare serial-looking number (i.e. it
+// was already a normal date string, or isn't a date at all) passes through
+// unchanged.
+function formatDateCell(value){
+  const str = (value===undefined || value===null) ? '' : String(value).trim();
+  if(!str) return '';
+  if(!/^\d+(\.\d+)?$/.test(str)) return str;
+  const serial = Number(str);
+  if(!(serial > 1000 && serial < 100000)) return str;
+  const d = new Date(Math.round((serial - 25569) * 86400 * 1000));
+  if(isNaN(d.getTime())) return str;
+  const y = d.getUTCFullYear(), m = String(d.getUTCMonth()+1).padStart(2,'0'), day = String(d.getUTCDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
 }
 
 function mergeIntervals(pairs){
@@ -404,7 +417,8 @@ function buildGroups(parsed, opts){
 }
 
 // ---------- CSV/XLSX log parsing ----------
-let logRows = null, logHeaders = null;
+let logFiles = [];
+
 function guessCol(headers, keywords){
   const lower = headers.map(h=>String(h).toLowerCase());
   for(const kw of keywords){
@@ -413,39 +427,73 @@ function guessCol(headers, keywords){
   }
   return headers[0] || '';
 }
-function loadLogFile(file){
-  const reader = new FileReader();
-  reader.onload = e=>{
-    const wb = XLSX.read(e.target.result, {type:'binary'});
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
-    if(!rows.length){ showErr('The download log looks empty.'); return; }
-    logHeaders = rows[0].map(h=>String(h).trim());
-    logRows = rows.slice(1).map(r=>{
-      const o = {};
-      logHeaders.forEach((h,i)=>o[h]=r[i]!==undefined?String(r[i]).trim():'');
-      return o;
-    });
-    populateMapSelects();
-    document.getElementById('mapBox').classList.remove('hidden');
-    document.getElementById('csvPill').innerHTML =
-      `<div class="filepill"><span class="dot"></span>${file.name} — ${logRows.length} rows</div>`;
-    checkReady();
-  };
-  reader.readAsBinaryString(file);
+function guessColOptional(headers, keywords){
+  const lower = headers.map(h=>String(h).toLowerCase());
+  for(const kw of keywords){
+    const idx = lower.findIndex(h=>h.includes(kw));
+    if(idx>-1) return headers[idx];
+  }
+  return '';
 }
-function populateMapSelects(){
-  const sels = {
-    mapName: guessCol(logHeaders,['file name','filename','file']),
-    mapSite: guessCol(logHeaders,['site','source','vendor','provider']),
-    mapUrl: guessCol(logHeaders,['source page','url','link']),
-    mapPath: guessCol(logHeaders,['saved to','path','folder','destination']),
-    mapDate: guessCol(logHeaders,['date'])
+function detectLogColumns(headers){
+  return {
+    name: guessCol(headers,['file name','filename','file']),
+    site: guessColOptional(headers,['site','source','vendor','provider']),
+    url: guessColOptional(headers,['source page','url','link']),
+    path: guessColOptional(headers,['saved to','path','folder','destination']),
+    date: guessColOptional(headers,['date']),
+    composer: guessColOptional(headers,['composer','writer','songwriter']),
+    publisher: guessColOptional(headers,['publisher','pro affiliation','label']),
+    isrc: guessColOptional(headers,['isrc'])
   };
-  Object.entries(sels).forEach(([id,guess])=>{
-    const sel = document.getElementById(id);
-    sel.innerHTML = (id==='mapDate' ? ['(none)',...logHeaders] : logHeaders)
-      .map(h=>`<option ${h===guess?'selected':''}>${h}</option>`).join('');
+}
+
+function loadLogFiles(fileList){
+  const files = Array.from(fileList).filter(f=>{
+    if(logFiles.some(lf=>lf.name===f.name)){ return false; }
+    return true;
+  });
+  if(!files.length) return;
+  let pending = files.length;
+  files.forEach(file=>{
+    const reader = new FileReader();
+    reader.onload = e=>{
+      try{
+        const wb = XLSX.read(e.target.result, {type:'binary'});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+        if(!rows.length){
+          showErr(`${file.name} looks empty — skipped.`);
+        } else {
+          const headers = rows[0].map(h=>String(h).trim());
+          const dataRows = rows.slice(1).map(r=>{
+            const o = {};
+            headers.forEach((h,i)=>o[h]=r[i]!==undefined?String(r[i]).trim():'');
+            return o;
+          });
+          logFiles.push({ name: file.name, rows: dataRows, colMap: detectLogColumns(headers) });
+        }
+      } catch(err){
+        showErr(`Couldn't read ${file.name}: ${err.message}`);
+      }
+      pending--;
+      if(pending===0){ renderLogPills(); checkReady(); }
+    };
+    reader.readAsBinaryString(file);
+  });
+}
+
+function renderLogPills(){
+  const box = document.getElementById('csvPillList');
+  box.innerHTML = logFiles.map((lf,i)=>
+    `<div class="filepill"><span class="dot"></span>${lf.name} — ${lf.rows.length} rows<span class="pill-remove" data-idx="${i}" title="Remove this log">✕</span></div>`
+  ).join('');
+  box.querySelectorAll('.pill-remove').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      logFiles.splice(+btn.dataset.idx, 1);
+      renderLogPills();
+      checkReady();
+    });
   });
 }
 
@@ -466,13 +514,13 @@ function loadXmlFile(file){
 
 function showErr(msg){ const b=document.getElementById('errBox'); b.textContent=msg; b.classList.remove('hidden'); }
 function clearErr(){ document.getElementById('errBox').classList.add('hidden'); }
-function checkReady(){ document.getElementById('processBtn').disabled = !(xmlParsed && logRows); }
+function checkReady(){ document.getElementById('processBtn').disabled = !(xmlParsed && logFiles.length); }
 
 // ---------- wire up drop zones ----------
-function wireDrop(dropId, inputId, onFile){
+function wireDrop(dropId, inputId, onFiles, multi){
   const drop = document.getElementById(dropId), input = document.getElementById(inputId);
   drop.addEventListener('click', ()=>input.click());
-  input.addEventListener('change', ()=>{ if(input.files[0]) onFile(input.files[0]); });
+  input.addEventListener('change', ()=>{ if(input.files.length) onFiles(multi ? input.files : [input.files[0]]); input.value=''; });
   ['dragover','dragleave','drop'].forEach(evt=>{
     drop.addEventListener(evt, e=>{
       e.preventDefault();
@@ -480,27 +528,29 @@ function wireDrop(dropId, inputId, onFile){
       else drop.classList.remove('over');
     });
   });
-  drop.addEventListener('drop', e=>{ if(e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]); });
+  drop.addEventListener('drop', e=>{ if(e.dataTransfer.files.length) onFiles(multi ? e.dataTransfer.files : [e.dataTransfer.files[0]]); });
 }
-wireDrop('dropXml','xmlInput', loadXmlFile);
-wireDrop('dropCsv','csvInput', loadLogFile);
+wireDrop('dropXml','xmlInput', files=>loadXmlFile(files[0]), false);
+wireDrop('dropCsv','csvInput', loadLogFiles, true);
 
 // ---------- matching ----------
 function matchToLog(fileName){
   const target = fileName.toLowerCase().trim();
-  const nameCol = document.getElementById('mapName').value;
-  let best = null, bestScore = 0;
-  for(const row of logRows){
-    const cand = (row[nameCol]||'').toLowerCase().trim();
-    if(!cand) continue;
-    if(cand === target) return { row, confidence:'exact' };
-    const candNoExt = cand.replace(/\.[a-z0-9]+$/,'');
-    const targetNoExt = target.replace(/\.[a-z0-9]+$/,'');
-    if(candNoExt === targetNoExt) return { row, confidence:'exact' };
-    const score = similarity(candNoExt, targetNoExt);
-    if(score > bestScore){ bestScore = score; best = row; }
+  const targetNoExt = target.replace(/\.[a-z0-9]+$/,'');
+  let best = null, bestScore = 0, bestFile = null;
+  for(const lf of logFiles){
+    const nameCol = lf.colMap.name;
+    for(const row of lf.rows){
+      const cand = (row[nameCol]||'').toLowerCase().trim();
+      if(!cand) continue;
+      if(cand === target || cand.replace(/\.[a-z0-9]+$/,'') === targetNoExt){
+        return { row, colMap: lf.colMap, confidence:'exact' };
+      }
+      const score = similarity(cand.replace(/\.[a-z0-9]+$/,''), targetNoExt);
+      if(score > bestScore){ bestScore = score; best = row; bestFile = lf; }
+    }
   }
-  if(best && bestScore >= 0.88) return { row:best, confidence:'fuzzy' };
+  if(best && bestScore >= 0.88) return { row:best, colMap: bestFile.colMap, confidence:'fuzzy' };
   return null;
 }
 
@@ -593,10 +643,6 @@ document.getElementById('processBtn').addEventListener('click', ()=>{
     flagStock: document.getElementById('optFlag').checked
   };
   const { groups, timebase } = buildGroups(xmlParsed, opts);
-  const siteCol = document.getElementById('mapSite').value;
-  const urlCol = document.getElementById('mapUrl').value;
-  const pathCol = document.getElementById('mapPath').value;
-  const dateCol = document.getElementById('mapDate').value;
 
   const footage = [], music = [], nonStock = [];
 
@@ -608,14 +654,17 @@ document.getElementById('processBtn').addEventListener('click', ()=>{
     const uniqueSec = +(g.uniqueFrames/timebase).toFixed(2);
 
     if(match){
-      const row = match.row;
+      const row = match.row, cm = match.colMap;
       const rec = {
         'Clip / Cue Name': g.fileName,
         'Matched Confidence': match.confidence,
-        'Source Site': row[siteCol]||'',
-        'Source URL': row[urlCol]||'',
-        'Saved To': row[pathCol]||'',
-        'Download Date': dateCol!=='(none)' ? (row[dateCol]||'') : '',
+        'Source Site': row[cm.site]||'',
+        'Source URL': row[cm.url]||'',
+        'Saved To': row[cm.path]||'',
+        'Download Date': formatDateCell(row[cm.date]),
+        'Composer': cm.composer ? (row[cm.composer]||'') : '',
+        'Publisher': cm.publisher ? (row[cm.publisher]||'') : '',
+        'ISRC': cm.isrc ? (row[cm.isrc]||'') : '',
         'Times Used': g.timesUsed,
         'Total Duration (TC)': totalTC,
         'Total Duration (sec)': totalSec,
@@ -632,6 +681,7 @@ document.getElementById('processBtn').addEventListener('click', ()=>{
         'Clip / Cue Name': g.fileName,
         'Matched Confidence': 'unmatched',
         'Source Site': '', 'Source URL': '', 'Saved To': '', 'Download Date': '',
+        'Composer': '', 'Publisher': '', 'ISRC': '',
         'Times Used': g.timesUsed,
         'Total Duration (TC)': totalTC, 'Total Duration (sec)': totalSec,
         'Unique Duration (TC)': uniqueTC, 'Unique Duration (sec)': uniqueSec,
@@ -675,7 +725,7 @@ function renderResults(res){
   document.getElementById('summaryCards').innerHTML = `
     <div class="card"><div class="num">${res.footage.length}</div><div class="lab">Stock clips matched</div></div>
     <div class="card"><div class="num">${res.music.length}</div><div class="lab">Music / audio cues</div></div>
-    <div class="card"><div class="num">${res.nonStock.length}</div><div class="lab">Non-stock media</div></div>
+    <div class="card"><div class="num">${res.nonStock.length}</div><div class="lab">Unmatched media</div></div>
     <div class="card"><div class="num">${formatTC(totalFootageSec*res.timebase, res.timebase)}</div><div class="lab">Total stock footage used</div></div>
   `;
 
@@ -694,7 +744,7 @@ function renderResults(res){
   document.getElementById('previewTables').innerHTML =
     tbl('Stock footage used', res.footage, ['Clip / Cue Name','Source Site','Times Used','Total Duration (TC)','Unique Duration (TC)']) +
     tbl('Music cue sheet', res.music, ['Clip / Cue Name','Source Site','Likely Stock Music','Times Used','Total Duration (TC)']) +
-    tbl('Non-stock media', res.nonStock, ['Clip Name','Likely Stock Flag','Guessed Source','Times Used','Total Duration (TC)']);
+    tbl('Unmatched media', res.nonStock, ['Clip Name','Likely Stock Flag','Guessed Source','Times Used','Total Duration (TC)']);
 }
 
 document.getElementById('downloadBtn').addEventListener('click', async ()=>{
@@ -732,6 +782,7 @@ document.getElementById('downloadBtn').addEventListener('click', async ()=>{
     const footageCols = ['Clip / Cue Name','Matched Confidence','Source Site','Source URL','Saved To','Download Date',
       'Times Used','Total Duration (TC)','Total Duration (sec)','Unique Duration (TC)','Unique Duration (sec)','Timeline File Path'];
     const musicCols = ['Clip / Cue Name','Matched Confidence','Source Site','Source URL','Saved To','Download Date',
+      'Composer','Publisher','ISRC',
       'Times Used','Total Duration (TC)','Total Duration (sec)','Unique Duration (TC)','Unique Duration (sec)',
       'Likely Stock Music','Flag Note','Timeline File Path'];
     const nonStockCols = ['Clip Name','Any Disabled Instance','Times Used','Total Duration (TC)','Total Duration (sec)',
@@ -739,7 +790,7 @@ document.getElementById('downloadBtn').addEventListener('click', async ()=>{
 
     addSheet('Stock Footage Used', lastResult.footage, footageCols);
     addSheet('Music Cue Sheet', lastResult.music, musicCols);
-    addSheet('Non-Stock Media', lastResult.nonStock, nonStockCols);
+    addSheet('Unmatched Media', lastResult.nonStock, nonStockCols);
 
     const totalFootageSec = lastResult.footage.reduce((a,r)=>a+r['Primary Total Used'],0);
     const totalMusicSec = lastResult.music.reduce((a,r)=>a+r['Primary Total Used'],0);
@@ -755,7 +806,7 @@ document.getElementById('downloadBtn').addEventListener('click', async ()=>{
       [],
       ['Stock clips matched', lastResult.footage.length],
       ['Music / audio cues', lastResult.music.length],
-      ['Non-stock media items', lastResult.nonStock.length],
+      ['Unmatched media items', lastResult.nonStock.length],
       [],
       ['Total stock footage duration used (sec)', totalFootageSec.toFixed(2)],
       ['Total stock footage duration used (TC)', formatTC(totalFootageSec*lastResult.timebase, lastResult.timebase)],

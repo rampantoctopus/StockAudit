@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<!DOCTYPE xmeml>
+<xmeml version="4">
+  <sequence id="sequence-1">
+    <name>StockAudit_Test_Timeline</name>
+    <duration>3300</duration>
+    <rate>
+      <timebase>25</timebase>
+      <ntsc>FALSE</ntsc>
+    </rate>
+    <media>
+      <video>
+        <track>
+          <clipitem id="clipitem-1">
+            <name>storyblocks-SBV-347821-aerial-coastline-4k.mp4</name>
+            <enabled>TRUE</enabled>
+            <start>0</start>
+            <end>250</end>
+            <in>0</in>
+            <out>250</out>
+            <masterclipid>masterclip-1</masterclipid>
+            <file id="file-1">
+              <name>storyblocks-SBV-347821-aerial-coastline-4k.mp4</name>
+              <pathurl>file://localhost/Users/mjo/Movies/Footage/storyblocks-SBV-347821-aerial-coastline-4k.mp4</pathurl>
+            </file>
+          </clipitem>
+          <clipitem id="clipitem-2">
+            <name>storyblocks-SBV-347821-aerial-coastline-4k.mp4</name>
+            <enabled>TRUE</enabled>
+            <start>800</start>
+            <end>1050</end>
+            <in>125</in>
+            <out>375</out>
+            <masterclipid>masterclip-1</masterclipid>
+            <file id="file-1"/>
+          </clipitem>
+          <clipitem id="clipitem-3">
+            <name>shutterstock_1849302.mp4</name>
+            <enabled>TRUE</enabled>
+            <start>1050</start>
+            <end>1175</end>
+            <in>0</in>
+            <out>125</out>
+            <masterclipid>masterclip-2</masterclipid>
+            <file id="file-2">
+              <name>shutterstock_1849302.mp4</name>
+              <pathurl>file://localhost/Users/mjo/Movies/Footage/shutterstock_1849302.mp4</pathurl>
+            </file>
+          </clipitem>
+          <clipitem id="clipitem-4">
+            <name>interview_sit_down_cam1.mov</name>
+            <enabled>TRUE</enabled>
+            <start>1175</start>
+            <end>3975</end>
+            <in>500</in>
+            <out>3300</out>
+            <masterclipid>masterclip-3</masterclipid>
+            <file id="file-3">
+              <name>interview_sit_down_cam1.mov</name>
+              <pathurl>file://localhost/Users/mjo/Movies/Footage/interview_sit_down_cam1.mov</pathurl>
+            </file>
+          </clipitem>
+          <clipitem id="clipitem-5">
+            <name>b_roll_alt_take_02.mp4</name>
+            <enabled>FALSE</enabled>
+            <start>3975</start>
+            <end>4050</end>
+            <in>0</in>
+            <out>75</out>
+            <masterclipid>masterclip-4</masterclipid>
+            <file id="file-4">
+              <name>b_roll_alt_take_02.mp4</name>
+              <pathurl>file://localhost/Users/mjo/Movies/Footage/b_roll_alt_take_02.mp4</pathurl>
+            </file>
+          </clipitem>
+        </track>
+      </video>
+      <audio>
+        <track>
+          <clipitem id="clipitem-6">
+            <name>corporate_uplift_loop_ES_449812.mp3</name>
+            <enabled>TRUE</enabled>
+            <start>0</start>
+            <end>2350</end>
+            <in>0</in>
+            <out>2350</out>
+            <masterclipid>masterclip-5</masterclipid>
+            <file id="file-5">
+              <name>corporate_uplift_loop_ES_449812.mp3</name>
+              <pathurl>file://localhost/Users/mjo/Music/Cues/corporate_uplift_loop_ES_449812.mp3</pathurl>
+            </file>
+          </clipitem>
+          <clipitem id="clipitem-7">
+            <name>field_recording_ambience_rain.wav</name>
+            <enabled>TRUE</enabled>
+            <start>2350</start>
+            <end>3550</end>
+            <in>0</in>
+            <out>1200</out>
+            <masterclipid>masterclip-6</masterclipid>
+            <file id="file-6">
+              <name>field_recording_ambience_rain.wav</name>
+              <pathurl>file://localhost/Users/mjo/Music/Cues/field_recording_ambience_rain.wav</pathurl>
+            </file>
+          </clipitem>
+        </track>
+      </audio>
+    </media>
+  </sequence>
+</xmeml>

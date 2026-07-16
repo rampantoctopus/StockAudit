@@ -1,6 +1,6 @@
 {
   "name": "stockaudit",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Audit your XML against your StockSilo download log and export a licensing-ready workbook.",
   "main": "main.js",
   "author": "RampantOctopus Softworks",
