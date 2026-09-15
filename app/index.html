@@ -772,9 +772,24 @@ document.getElementById('downloadBtn').addEventListener('click', async ()=>{
       ws.columns = cols.map(c=>({ header:c, key:c, width: Math.max(14, Math.min(42, c.length+6)) }));
       ws.getRow(1).eachCell(cell=>{ cell.fill = HEADER_FILL; cell.font = HEADER_FONT; });
       ws.views = [{ state:'frozen', ySplit:1 }];
+      const urlColIdx = cols.indexOf('Source URL');
       rows.forEach(r=>{
-        const row = ws.addRow(cols.map(c=>r[c]));
+        const values = cols.map(c=>{
+          const v = r[c];
+          // Turn a real Source URL into a live, clickable hyperlink cell
+          // instead of plain text — one click back to the product page to
+          // re-license/re-purchase, rather than a URL you'd have to copy out.
+          if(c === 'Source URL' && v && /^https?:\/\//i.test(v)) return { text: v, hyperlink: v };
+          return v;
+        });
+        const row = ws.addRow(values);
         if(isFlaggedRow(r)) row.eachCell(cell=>{ cell.fill = FLAG_FILL; });
+        if(urlColIdx > -1){
+          const cell = row.getCell(urlColIdx + 1);
+          if(cell.value && typeof cell.value === 'object' && cell.value.hyperlink){
+            cell.font = { color:{argb:'FF5FB3A3'}, underline: true };
+          }
+        }
       });
       return ws;
     }
