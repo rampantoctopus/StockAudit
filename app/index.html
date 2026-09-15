@@ -466,9 +466,26 @@ function loadLogFiles(fileList){
           showErr(`${file.name} looks empty — skipped.`);
         } else {
           const headers = rows[0].map(h=>String(h).trim());
-          const dataRows = rows.slice(1).map(r=>{
+          const dataRows = rows.slice(1).map((r,rIdx)=>{
             const o = {};
-            headers.forEach((h,i)=>o[h]=r[i]!==undefined?String(r[i]).trim():'');
+            headers.forEach((h,i)=>{
+              let val = r[i]!==undefined?String(r[i]).trim():'';
+              // Some tools (e.g. StockSilo) write links into a .csv as an
+              // Excel-style =HYPERLINK("url","label") formula rather than a
+              // plain URL string. A bare CSV has no formula engine to
+              // evaluate that, so sheet_to_json returns '' for the cell —
+              // fall back to reading the raw formula text and pulling the
+              // URL out of it directly.
+              if(!val){
+                const cellRef = XLSX.utils.encode_cell({r: rIdx+1, c: i});
+                const cell = sheet[cellRef];
+                if(cell && cell.f){
+                  const m = /HYPERLINK\(\s*"([^"]+)"/i.exec(cell.f);
+                  if(m) val = m[1];
+                }
+              }
+              o[h] = val;
+            });
             return o;
           });
           logFiles.push({ name: file.name, rows: dataRows, colMap: detectLogColumns(headers) });
