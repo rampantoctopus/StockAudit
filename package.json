@@ -11,14 +11,20 @@
     "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^31.0.0",
+    "electron": "^44.0.0",
     "electron-builder": "^24.13.3"
   },
   "build": {
     "appId": "com.mjo.stockaudit",
     "productName": "StockAudit",
     "copyright": "Copyright © 2026 RampantOctopus Softworks",
-    "files": ["main.js", "preload.js", "app/**/*", "lib/**/*", "build/icon.png"],
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "lib/**/*",
+      "build/icon.png"
+    ],
     "afterPack": "scripts/afterPack.js",
     "mac": {
       "icon": "build/icon.icns",
@@ -27,19 +33,38 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.inherit.plist",
       "gatekeeperAssess": false,
-      "notarize": { "teamId": "2B67R2996C" },
+      "notarize": {
+        "teamId": "2B67R2996C"
+      },
       "target": [
-        { "target": "dmg", "arch": ["arm64", "x64"] },
-        { "target": "zip", "arch": ["arm64", "x64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ]
     },
     "win": {
       "icon": "build/icon.ico",
-      "target": ["nsis", "portable"]
+      "target": [
+        "nsis",
+        "portable"
+      ]
     },
     "linux": {
       "icon": "build/icons",
-      "target": ["AppImage"]
+      "target": [
+        "AppImage"
+      ]
     }
   }
 }
